@@ -1,6 +1,9 @@
 <?php
 
+use MediaWiki\FileRepo\LocalRepo;
 use Wikimedia\FileBackend\SwiftFileBackend;
+
+$wgMirahezeMagicSwiftKey = $wmgSwiftPassword;
 
 $wgFileBackends[] = [
 	'class'              => SwiftFileBackend::class,
@@ -12,7 +15,7 @@ $wgFileBackends[] = [
 	'swiftStorageUrl'    => 'https://swift-lb.wikitide.net/v1/AUTH_mw',
 	'swiftUser'          => 'mw:media',
 	'swiftKey'           => $wmgSwiftPassword,
-	'swiftTempUrlKey'    => '',
+	'swiftTempUrlKey'    => $wmgSwiftTempUrlKey,
 	'parallelize'        => 'implicit',
 	'cacheAuthInfo'      => true,
 	'readAffinity'       => true,
@@ -22,10 +25,51 @@ $wgFileBackends[] = [
 	'reqTimeout'          => 900,
 ];
 
-$beta = preg_match( '/^(.*)\.(mirabeta|nexttide)\.org$/', $wi->server );
-$redisServerIP = $beta ?
+// This is for wikimedias commons wiki
+$wgFileBackends[] = [
+	'class'              => SwiftFileBackend::class,
+	'name'               => 'miraheze-swift-shared',
+	// This is the prefix for the container that it starts with.
+	'wikiId'             => "miraheze-wikipedia-commons",
+	'lockManager'        => 'redisLockManager',
+	'swiftAuthUrl'       => 'https://swift-lb.wikitide.net/auth',
+	'swiftStorageUrl'    => 'https://swift-lb.wikitide.net/v1/AUTH_mw',
+	'swiftUser'          => 'mw:media',
+	'swiftKey'           => $wmgSwiftPassword,
+	'swiftTempUrlKey'    => $wmgSwiftTempUrlKey,
+	'parallelize'        => 'implicit',
+	'cacheAuthInfo'      => true,
+	'readAffinity'       => true,
+	'readUsers'           => [ 'mw:media' ],
+	'writeUsers'          => [ 'mw:media' ],
+	'connTimeout'         => 10,
+	'reqTimeout'          => 900,
+];
+
+// This is for miraheze commonswiki
+$wgFileBackends[] = [
+	'class'              => SwiftFileBackend::class,
+	'name'               => 'miraheze-swift-commons-shared',
+	// This is the prefix for the container that it starts with.
+	'wikiId'             => "miraheze-commonswiki",
+	'lockManager'        => 'redisLockManager',
+	'swiftAuthUrl'       => 'https://swift-lb.wikitide.net/auth',
+	'swiftStorageUrl'    => 'https://swift-lb.wikitide.net/v1/AUTH_mw',
+	'swiftUser'          => 'mw:media',
+	'swiftKey'           => $wmgSwiftPassword,
+	'swiftTempUrlKey'    => $wmgSwiftTempUrlKey,
+	'parallelize'        => 'implicit',
+	'cacheAuthInfo'      => true,
+	'readAffinity'       => true,
+	'readUsers'           => [ 'mw:media' ],
+	'writeUsers'          => [ 'mw:media' ],
+	'connTimeout'         => 10,
+	'reqTimeout'          => 900,
+];
+
+$redisServerIP = $wi->isBeta() ?
 	'10.0.15.118:6379' :
-	'10.0.15.142:6379';
+	'10.0.19.149:6379';
 
 $wgLockManagers[] = [
 	'name' => 'redisLockManager',
@@ -34,7 +78,7 @@ $wgLockManagers[] = [
 		'rdb1' => $redisServerIP,
 	],
 	'srvsByBucket' => [
-		0 => [ 'rdb1' ]
+		0 => [ 'rdb1' ],
 	],
 	'redisConfig' => [
 		'connectTimeout' => 2,
@@ -88,8 +132,7 @@ $wgLocalFileRepo = [
 	'deletedHashLevels' => 3,
 	'abbrvThreshold' => 160,
 	'isPrivate' => $cwPrivate,
-	'zones' => $cwPrivate
-		? [
-			'thumb' => [ 'url' => "$wgScriptPath/thumb_handler.php" ] ]
-		: [],
+	'zones' => $cwPrivate ? [
+		'thumb' => [ 'url' => "$wgScriptPath/thumb_handler.php" ],
+	] : [],
 ];

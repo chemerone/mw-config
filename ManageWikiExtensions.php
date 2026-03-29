@@ -16,22 +16,27 @@
  *
  * 'requires' can be one of:
  *
- * activeusers: max integer amount of active users a wiki may have in order to enable this extension.
  * articles: max integer amount of articles a wiki may have in order to enable this extension.
  * extensions: array of other extensions that must be enabled in order to enable this extension.
+ * files: max integer amount of files a wiki may have in order to enable this extension.
  * pages: max integer amount of pages a wiki may have in order to enable this extension.
  * permissions: array of permissions a user must have to be able to enable this extension. Regardless of this value, a user must always have the managewiki permission.
+ * users: max integer amount of users a wiki may have in order to enable this extension.
  * visibility['state']: can be either 'private' or 'public'. If set to 'private' this extension can only be enabled on private wikis. If set to 'public' it can only be enabled on public wikis.
  *
  * 'install'/'remove' can be one of:
  *
- * files: array, mapped to location => source.
  * mwscript: array, mapped to script path => array of options.
  * namespaces: array of which namespaces and namespace data to install with extension; 'remove' only needs namespace ID.
  * permissions: array of which permissions to install with extension.
  * settings: array of ManageWikiSettings to modify when the extension is enabled, mapped variable => value.
  * sql: array of sql files to install with extension, mapped table name => sql file path.
  */
+
+use CirrusSearch\Maintenance\ForceSearchIndex;
+use CirrusSearch\Maintenance\UpdateSearchIndexConfig;
+use Miraheze\MirahezeMagic\Maintenance\CreateCargoDB;
+use Miraheze\MirahezeMagic\Maintenance\PopulateWikibaseSitesTable;
 
 $wgManageWikiExtensions = [
 	// API
@@ -69,14 +74,14 @@ $wgManageWikiExtensions = [
 		'name' => 'VisualEditor',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:VisualEditor',
 		'conflicts' => false,
+		'help' => 'Note: This extension can take up to 5 minutes to fully activate due to browser caching. Try to perform a [[w:WP:REFRESH|hard refresh or cache purge]], which makes it available on your browser immediately.',
 		'requires' => [],
 		'section' => 'editors',
 	],
 
 	// Media handlers
 	'3d' => [
-		'name' => '3d',
-		'displayname' => '3D',
+		'name' => '3D',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:3D',
 		'conflicts' => false,
 		'requires' => [],
@@ -129,7 +134,7 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'transcode' => "$IP/extensions/TimedMediaHandler/sql/tables-generated.sql"
+				'transcode' => 'extensions/TimedMediaHandler/sql/tables-generated.sql',
 			],
 			'permissions' => [
 				'sysop' => [
@@ -154,7 +159,7 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'uw_campaigns' => "$IP/extensions/UploadWizard/sql/mysql/tables-generated.sql",
+				'uw_campaigns' => 'extensions/UploadWizard/sql/mysql/tables-generated.sql',
 			],
 			'namespaces' => [
 				'Campaign' => [
@@ -209,8 +214,8 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'ajaxpoll_info' => "$IP/extensions/AJAXPoll/sql/create-table--ajaxpoll_info.sql",
-				'ajaxpoll_vote' => "$IP/extensions/AJAXPoll/sql/create-table--ajaxpoll_vote.sql"
+				'ajaxpoll_info' => 'extensions/AJAXPoll/sql/create-table--ajaxpoll_info.sql',
+				'ajaxpoll_vote' => 'extensions/AJAXPoll/sql/create-table--ajaxpoll_vote.sql',
 			],
 			'permissions' => [
 				'user' => [
@@ -237,7 +242,53 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'babel' => "$IP/extensions/Babel/sql/tables-generated.sql"
+				'babel' => 'extensions/Babel/sql/tables-generated.sql',
+			],
+		],
+		'section' => 'parserhooks',
+	],
+	'bucket' => [
+		'name' => 'Bucket',
+		'linkPage' => 'https://meta.weirdgloop.org/w/Extension:Bucket',
+		'conflicts' => false,
+		'requires' => [],
+		'install' => [
+			'sql' => [
+				'bucket_pages' => 'extensions/Bucket/sql/tables-generated.sql',
+				'bucket_schemas' => 'extensions/Bucket/sql/tables-generated.sql',
+				'bucket__bucket_issues' => 'extensions/Bucket/sql/issues-table.sql',
+			],
+			'mwscript' => [
+				'Bucket:CreateInitialSchemaForBucketIssues' => [],
+			],
+			'permissions' => [
+				'sysop' => [
+					'permissions' => [
+						'editbucket',
+					],
+				],
+			],
+			'namespaces' => [
+				'Bucket' => [
+					'id' => 9592,
+					'searchable' => 0,
+					'subpages' => 0,
+					'protection' => 'editbucket',
+					'content' => 0,
+					'aliases' => [],
+					'contentmodel' => 'json',
+					'additional' => [],
+				],
+				'Bucket_talk' => [
+					'id' => 9593,
+					'searchable' => 0,
+					'subpages' => 0,
+					'protection' => '',
+					'content' => 0,
+					'aliases' => [],
+					'contentmodel' => 'wikitext',
+					'additional' => [],
+				],
 			],
 		],
 		'section' => 'parserhooks',
@@ -261,11 +312,11 @@ $wgManageWikiExtensions = [
 		],
 		'install' => [
 			'mwscript' => [
-				"$IP/extensions/MirahezeMagic/maintenance/createCargoDB.php" => [],
+				CreateCargoDB::class => [],
 			],
 			'sql' => [
-				'cargo_tables' => "$IP/extensions/Cargo/sql/Cargo.sql",
-				'cargo_backlinks' => "$IP/extensions/Cargo/sql/cargo_backlinks.sql"
+				'cargo_tables' => 'extensions/Cargo/sql/Cargo.sql',
+				'cargo_backlinks' => 'extensions/Cargo/sql/cargo_backlinks.sql',
 			],
 			'permissions' => [
 				'*' => [
@@ -320,10 +371,11 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'cs_comments' => "$IP/extensions/CommentStreams/sql/mysql/cs_comments.sql",
-				'cs_replies' => "$IP/extensions/CommentStreams/sql/mysql/cs_replies.sql",
-				'cs_votes' => "$IP/extensions/CommentStreams/sql/mysql/cs_votes.sql",
-				'cs_watchlist' => "$IP/extensions/CommentStreams/sql/mysql/cs_watchlist.sql",
+				'cs_associated_pages' => 'extensions/CommentStreams/sql/mysql/cs_associated_pages.sql',
+				'cs_comments' => 'extensions/CommentStreams/sql/mysql/cs_comments.sql',
+				'cs_replies' => 'extensions/CommentStreams/sql/mysql/cs_replies.sql',
+				'cs_votes' => 'extensions/CommentStreams/sql/mysql/cs_votes.sql',
+				'cs_watchlist' => 'extensions/CommentStreams/sql/mysql/cs_watchlist.sql',
 			],
 			'permissions' => [
 				'user' => [
@@ -355,9 +407,9 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'Comments' => "$IP/extensions/Comments/sql/comments.sql",
-				'Comments_block' => "$IP/extensions/Comments/sql/comments_block.sql",
-				'Comments_Vote' => "$IP/extensions/Comments/sql/comments_vote.sql",
+				'Comments' => 'extensions/Comments/sql/comments.sql',
+				'Comments_block' => 'extensions/Comments/sql/comments_block.sql',
+				'Comments_Vote' => 'extensions/Comments/sql/comments_vote.sql',
 			],
 			'permissions' => [
 				'*' => [
@@ -405,17 +457,16 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'section' => 'parserhooks',
 	],
-	'customsearchprofiles' => [
-		'name' => 'CustomSearchProfiles',
-		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:CustomSearchProfiles',
-		'help' => 'Note: This extension is currently not configurable in ManageWiki. Please create a task on Phorge or a pull request to configure it.',
-		'conflicts' => false,
-		'requires' => [],
-		'section' => 'other',
-	],
 	'customsubtitle' => [
 		'name' => 'CustomSubtitle',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:CustomSubtitle',
+		'conflicts' => false,
+		'requires' => [],
+		'section' => 'parserhooks',
+	],
+	'details' => [
+		'name' => 'Details',
+		'linkPage' => 'https://www.mediawiki.org/wiki/Extension:Details',
 		'conflicts' => false,
 		'requires' => [],
 		'section' => 'parserhooks',
@@ -442,7 +493,7 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'drafts' => "$IP/extensions/Drafts/sql/Drafts.sql",
+				'drafts' => 'extensions/Drafts/sql/Drafts.sql',
 			],
 		],
 		'section' => 'parserhooks',
@@ -457,21 +508,15 @@ $wgManageWikiExtensions = [
 	'dynamicpagelist' => [
 		'name' => 'DynamicPageList',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:DynamicPageList_(Wikimedia)',
-		'conflicts' => 'dynamicpagelist3',
+		'conflicts' => 'dynamicpagelist4',
 		'requires' => [],
 		'section' => 'parserhooks',
 	],
-	'dynamicpagelist3' => [
-		'name' => 'DynamicPageList3',
-		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:DynamicPageList3',
+	'dynamicpagelist4' => [
+		'name' => 'DynamicPageList4',
+		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:DynamicPageList4',
 		'conflicts' => 'dynamicpagelist',
 		'requires' => [],
-		'install' => [
-			'mwscript' => [
-				"$IP/extensions/DynamicPageList3/maintenance/CreateTemplate.php" => [],
-				"$IP/extensions/DynamicPageList3/maintenance/CreateView.php" => [],
-			],
-		],
 		'section' => 'parserhooks',
 	],
 	'embedspotify' => [
@@ -484,6 +529,13 @@ $wgManageWikiExtensions = [
 	'timeline' => [
 		'name' => 'EasyTimeline',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:EasyTimeline',
+		'conflicts' => false,
+		'requires' => [],
+		'section' => 'parserhooks',
+	],
+	'floatingui' => [
+		'name' => 'FloatingUI',
+		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:FloatingUI',
 		'conflicts' => false,
 		'requires' => [],
 		'section' => 'parserhooks',
@@ -541,6 +593,13 @@ $wgManageWikiExtensions = [
 	'imagemap' => [
 		'name' => 'ImageMap',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:ImageMap',
+		'conflicts' => false,
+		'requires' => [],
+		'section' => 'parserhooks',
+	],
+	'imgtag' => [
+		'name' => 'ImgTag',
+		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:ImgTag',
 		'conflicts' => false,
 		'requires' => [],
 		'section' => 'parserhooks',
@@ -693,14 +752,6 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'section' => 'parserhooks',
 	],
-	'mintydocs' => [
-		'name' => 'MintyDocs',
-		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:MintyDocs',
-		'conflicts' => false,
-		'requires' => [],
-		'install' => [],
-		'section' => 'parserhooks',
-	],
 	'mscalendar' => [
 		'name' => 'MsCalendar',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:MsCalendar',
@@ -708,7 +759,7 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'mscal_content' => "$IP/extensions/MsCalendar/sql/MsCalendar.sql"
+				'mscal_content' => 'extensions/MsCalendar/sql/MsCalendar.sql',
 			],
 		],
 		'section' => 'parserhooks',
@@ -717,6 +768,7 @@ $wgManageWikiExtensions = [
 		'name' => 'MsCatSelect',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:MsCatSelect',
 		'conflicts' => false,
+		'help' => 'Note: This extension can interfere with categories on non-content pages such as templates. Consider using [[meta:Gadgets/HotCat|HotCat]] instead.',
 		'requires' => [],
 		'section' => 'parserhooks',
 	],
@@ -762,13 +814,6 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'section' => 'parserhooks',
 	],
-	'numberheadings' => [
-		'name' => 'NumberHeadings',
-		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:NumberHeadings',
-		'conflicts' => false,
-		'requires' => [],
-		'section' => 'parserhooks',
-	],
 	'opengraphmeta' => [
 		'name' => 'OpenGraphMeta',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:OpenGraphMeta',
@@ -782,7 +827,7 @@ $wgManageWikiExtensions = [
 		'conflicts' => false,
 		'install' => [
 			'sql' => [
-				'ext_oredict_items' => "$IP/extensions/OreDict/install/sql/ext_oredict_items.sql"
+				'ext_oredict_items' => 'extensions/OreDict/install/sql/ext_oredict_items.sql',
 			],
 		],
 		'requires' => [],
@@ -803,6 +848,14 @@ $wgManageWikiExtensions = [
 				],
 			],
 		],
+		'section' => 'parserhooks',
+	],
+	'parserpower' => [
+		'name' => 'ParserPower',
+		'linkPage' => 'https://www.mediawiki.org/wiki/Extension:ParserPower',
+		'description' => 'A collection of extended parser functions for MediaWiki, particularly including functions for dealing with lists of values separated by a dynamically-specified delimiter.',
+		'conflicts' => false,
+		'requires' => [],
 		'section' => 'parserhooks',
 	],
 	'phonos' => [
@@ -849,20 +902,16 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'section' => 'parserhooks',
 	],
-	'randomgameunit' => [
-		'name' => 'RandomGameUnit',
-		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:RandomGameUnit',
-		'conflicts' => false,
-		'requires' => [
-			'extensions' => [
-				'socialprofile',
-			],
-		],
-		'section' => 'parserhooks',
-	],
 	'randomimage' => [
 		'name' => 'RandomImage',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:RandomImage',
+		'conflicts' => false,
+		'requires' => [],
+		'section' => 'parserhooks',
+	],
+	'randomimagebycategory' => [
+		'name' => 'RandomImageByCategory',
+		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:RandomImageByCategory',
 		'conflicts' => false,
 		'requires' => [],
 		'section' => 'parserhooks',
@@ -995,6 +1044,18 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'section' => 'parserhooks',
 	],
+	'tableprogresstracking' => [
+		'name' => 'TableProgressTracking',
+		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:TableProgressTracking',
+		'conflicts' => false,
+		'requires' => [],
+		'install' => [
+			'sql' => [
+				'table_progress_tracking' => 'extensions/TableProgressTracking/schema/mysql/tables-generated.sql',
+			],
+		],
+		'section' => 'parserhooks',
+	],
 	'tabs' => [
 		'name' => 'Tabs',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:Tabs',
@@ -1033,10 +1094,10 @@ $wgManageWikiExtensions = [
 		'conflicts' => false,
 		'install' => [
 			'sql' => [
-				'ext_tilesheet_images' => "$IP/extensions/Tilesheets/install/sql/ext_tilesheet_images.sql",
-				'ext_tilesheet_items' => "$IP/extensions/Tilesheets/install/sql/ext_tilesheet_items.sql",
-				'ext_tilesheet_languages' => "$IP/extensions/Tilesheets/install/sql/ext_tilesheet_languages.sql",
-				'ext_tilesheet_tilelinks' => "$IP/extensions/Tilesheets/install/sql/ext_tilesheet_tilelinks.sql"
+				'ext_tilesheet_images' => 'extensions/Tilesheets/install/sql/ext_tilesheet_images.sql',
+				'ext_tilesheet_items' => 'extensions/Tilesheets/install/sql/ext_tilesheet_items.sql',
+				'ext_tilesheet_languages' => 'extensions/Tilesheets/install/sql/ext_tilesheet_languages.sql',
+				'ext_tilesheet_tilelinks' => 'extensions/Tilesheets/install/sql/ext_tilesheet_tilelinks.sql',
 			],
 		],
 		'requires' => [
@@ -1074,13 +1135,6 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'section' => 'parserhooks',
 	],
-	'twittertag' => [
-		'name' => 'Twitter Tag',
-		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:TwitterTag',
-		'conflicts' => false,
-		'requires' => [],
-		'section' => 'parserhooks',
-	],
 	'urlgetparameters' => [
 		'name' => 'UrlGetParameters',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:UrlGetParameters',
@@ -1113,7 +1167,7 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'Vote' => "$IP/extensions/VoteNY/sql/vote.mysql"
+				'Vote' => 'extensions/VoteNY/sql/vote.mysql',
 			],
 			'permissions' => [
 				'user' => [
@@ -1155,13 +1209,6 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'section' => 'parserhooks',
 	],
-	'youtube' => [
-		'name' => 'YouTube',
-		'linkPage' => 'https://github.com/miraheze/YouTube',
-		'conflicts' => false,
-		'requires' => [],
-		'section' => 'parserhooks',
-	],
 
 	// Spam prevention
 	'approvedrevs' => [
@@ -1171,8 +1218,8 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'approved_revs_files' => "$IP/extensions/ApprovedRevs/sql/ApprovedFiles.sql",
-				'approved_revs' => "$IP/extensions/ApprovedRevs/sql/ApprovedRevs.sql"
+				'approved_revs_files' => 'extensions/ApprovedRevs/sql/ApprovedFiles.sql',
+				'approved_revs' => 'extensions/ApprovedRevs/sql/ApprovedRevs.sql',
 			],
 			'permissions' => [
 				'sysop' => [
@@ -1234,8 +1281,8 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'moderation' => "$IP/extensions/Moderation/sql/mysql/tables-generated.sql",
-				'moderation_block' => "$IP/extensions/Moderation/sql/mysql/tables-generated.sql"
+				'moderation' => 'extensions/Moderation/sql/mysql/tables-generated.sql',
+				'moderation_block' => 'extensions/Moderation/sql/mysql/tables-generated.sql',
 			],
 			'permissions' => [
 				'automoderated' => [
@@ -1292,16 +1339,68 @@ $wgManageWikiExtensions = [
 		],
 		'section' => 'specialpages',
 	],
+	'campaignevents' => [
+		'name' => 'CampaignEvents',
+		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:CampaignEvents',
+		'conflicts' => false,
+		'help' => 'Stewards: Do not enable this without T&S authority',
+		'requires' => [
+			'permissions' => [
+				'managewiki-restricted',
+			],
+		],
+		'install' => [
+			'sql' => [
+				'campaign_events' => 'extensions/CampaignEvents/db_patches/mysql/tables-generated.sql',
+			],
+			'namespaces' => [
+				'Event' => [
+					'id' => 1728,
+					'searchable' => 0,
+					'subpages' => 1,
+					'protection' => '',
+					'content' => 0,
+					'aliases' => [],
+					'contentmodel' => 'wikitext',
+					'additional' => [],
+				],
+				'Event_talk' => [
+					'id' => 1729,
+					'searchable' => 0,
+					'subpages' => 1,
+					'protection' => '',
+					'content' => 0,
+					'aliases' => [],
+					'contentmodel' => 'wikitext',
+					'additional' => [],
+				],
+			],
+			'permissions' => [
+				'sysop' => [
+					'permissions' => [
+						'campaignevents-delete-registration',
+					],
+					'addgroups' => [
+						'event-organizer',
+					],
+					'removegroups' => [
+						'event-organizer',
+					],
+				],
+				'event-organizer' => [
+					'permissions' => [
+						'campaignevents-enable-registration',
+						'campaignevents-organize-events',
+						'campaignevents-email-participants',
+					],
+				],
+			],
+		],
+		'section' => 'specialpages',
+	],
 	'citethispage' => [
 		'name' => 'CiteThisPage',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:CiteThisPage',
-		'conflicts' => false,
-		'requires' => [],
-		'section' => 'specialpages',
-	],
-	'contactpage' => [
-		'name' => 'ContactPage',
-		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:ContactPage',
 		'conflicts' => false,
 		'requires' => [],
 		'section' => 'specialpages',
@@ -1320,10 +1419,10 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'createdpageslist' => "$IP/extensions/CreatedPagesList/sql/patch-createdpageslist.sql",
+				'createdpageslist' => 'extensions/CreatedPagesList/sql/patch-createdpageslist.sql',
 			],
 			'mwscript' => [
-				"$IP/extensions/CreatedPagesList/maintenance/recalculateTable.php" => [],
+				'CreatedPagesList:recalculateTable' => [],
 			],
 		],
 		'section' => 'specialpages',
@@ -1374,14 +1473,6 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'section' => 'specialpages',
 	],
-	'featuredfeeds' => [
-		'name' => 'FeaturedFeeds',
-		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:FeaturedFeeds',
-		'help' => '<b>Configuration of </b><code>$wgFeaturedFeeds</code><b> is not possible in ManageWiki.</b><br/> File a task on <a href="https://meta.miraheze.org/wiki/Special:MyLanguage/Phorge">Phorge</a> or a pull request on our mw-config repository with the desired configuration',
-		'conflicts' => false,
-		'requires' => [],
-		'section' => 'other'
-	],
 	'flaggedrevs' => [
 		'name' => 'FlaggedRevs',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:FlaggedRevs',
@@ -1389,7 +1480,7 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'flaggedpages' => "$IP/extensions/FlaggedRevs/backend/schema/mysql/tables-generated.sql",
+				'flaggedpages' => 'extensions/FlaggedRevs/includes/backend/schema/mysql/tables-generated.sql',
 			],
 			'permissions' => [
 				'editor' => [
@@ -1449,53 +1540,6 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'section' => 'specialpages',
 	],
-	'growthexperiments' => [
-		'name' => 'GrowthExperiments',
-		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:GrowthExperiments',
-		'conflicts' => false,
-		'requires' => [
-			'extensions' => [
-				'visualeditor',
-			],
-		],
-		'install' => [
-			'sql' => [
-				'growthexperiments_link_recommendations' => "$IP/extensions/GrowthExperiments/sql/mysql/growthexperiments_link_recommendations.sql",
-				'growthexperiments_link_submissions' => "$IP/extensions/GrowthExperiments/sql/mysql/growthexperiments_link_submissions.sql",
-				'growthexperiments_mentee_data' => "$IP/extensions/GrowthExperiments/sql/mysql/growthexperiments_mentee_data.sql",
-				'growthexperiments_mentor_mentee' => "$IP/extensions/GrowthExperiments/sql/mysql/growthexperiments_mentor_mentee.sql",
-				'growthexperiments_user_impact' => "$IP/extensions/GrowthExperiments/sql/mysql/growthexperiments_user_impact.sql"
-			],
-			'permissions' => [
-				'sysop' => [
-					'permissions' => [
-						'setmentor',
-					],
-				],
-			],
-		],
-		'section' => 'specialpages',
-	],
-	'imagerating' => [
-		'name' => 'ImageRating',
-		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:ImageRating',
-		'conflicts' => false,
-		'requires' => [
-			'extensions' => [
-				'voteny',
-			],
-		],
-		'install' => [
-			'permissions' => [
-				'user' => [
-					'permissions' => [
-						'rateimage',
-					],
-				],
-			],
-		],
-		'section' => 'specialpages',
-	],
 	'linter' => [
 		'name' => 'Linter',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:Linter',
@@ -1503,7 +1547,7 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'linter' => "$IP/extensions/Linter/sql/mysql/tables-generated.sql"
+				'linter' => 'extensions/Linter/sql/mysql/tables-generated.sql',
 			],
 		],
 		'section' => 'specialpages',
@@ -1547,57 +1591,6 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'section' => 'specialpages',
 	],
-	'mediawikichat' => [
-		'name' => 'MediaWikiChat',
-		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:MediaWikiChat',
-		'conflicts' => false,
-		'requires' => [],
-		'install' => [
-			'sql' => [
-				'chat' => "$IP/extensions/MediaWikiChat/sql/chat.sql",
-				'chat_users' => "$IP/extensions/MediaWikiChat/sql/chat_users.sql"
-			],
-			'permissions' => [
-				'blockedfromchat' => [
-					'permissions' => [
-						'viewmyprivateinfo',
-					],
-				],
-				'chatmod' => [
-					'permissions' => [
-						'chat',
-						'modchat',
-					],
-					'addgroups' => [
-						'blockedfromchat',
-					],
-					'removegroups' => [
-						'blockedfromchat',
-					],
-				],
-				'user' => [
-					'permissions' => [
-						'chat',
-					],
-				],
-				'sysop' => [
-					'permissions' => [
-						'chat',
-						'modchat',
-					],
-					'addgroups' => [
-						'chatmod',
-						'blockedfromchat',
-					],
-					'removegroups' => [
-						'chatmod',
-						'blockedfromchat',
-					],
-				],
-			],
-		],
-		'section' => 'specialpages',
-	],
 	'newestpages' => [
 		'name' => 'Newest Pages',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:Newest_Pages',
@@ -1613,7 +1606,7 @@ $wgManageWikiExtensions = [
 			'extensions' => [
 				[
 					'dynamicpagelist',
-					'dynamicpagelist3',
+					'dynamicpagelist4',
 				],
 			],
 		],
@@ -1687,7 +1680,7 @@ $wgManageWikiExtensions = [
 	'pageschemas' => [
 		'name' => 'Page Schemas',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:Page_Schemas',
-		'conflicts' => 'semanticmediawiki',
+		'conflicts' => false,
 		'requires' => [],
 		'install' => [
 			'permissions' => [
@@ -1707,7 +1700,7 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'pagetriage_tags' => "$IP/extensions/PageTriage/sql/mysql/tables-generated.sql",
+				'pagetriage_tags' => 'extensions/PageTriage/sql/mysql/tables-generated.sql',
 			],
 		],
 		'section' => 'specialpages',
@@ -1728,36 +1721,10 @@ $wgManageWikiExtensions = [
 		],
 		'section' => 'specialpages',
 	],
-	'quizgame' => [
-		'name' => 'QuizGame',
-		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:QuizGame',
-		'conflicts' => false,
-		'requires' => [
-			'extensions' => [
-				'socialprofile',
-			],
-		],
-		'install' => [
-			'sql' => [
-				'quizgame_answers' => "$IP/extensions/QuizGame/sql/quizgame_answers.sql",
-				'quizgame_choice' => "$IP/extensions/QuizGame/sql/quizgame_choice.sql",
-				'quizgame_questions' => "$IP/extensions/QuizGame/sql/quizgame_questions.sql",
-				'quizgame_user_view' => "$IP/extensions/QuizGame/sql/quizgame_user_view.sql"
-			],
-			'permissions' => [
-				'sysop' => [
-					'permissions' => [
-						'quizadmin',
-					],
-				],
-			],
-		],
-		'section' => 'specialpages',
-	],
 	'replacetext' => [
 		'name' => 'Replace Text',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:Replace_Text',
-		'help' => 'Stewards and Wiki Mechanics: This extension should NOT be enabled on wikis created before May 12 without consulting the <a href="https://meta.miraheze.org/wiki/Special:MyLanguage/Tech:Volunteers" target="_blank">Technology Team</a> first',
+		'help' => 'Stewards and Wiki Mechanics: This extension should NOT be enabled on wikis created before 12 May 2024 without consulting the [[m:Special:MyLanguage/Tech:Volunteers|Technology Team]] first.',
 		'conflicts' => false,
 		'requires' => [
 			'permissions' => [
@@ -1782,7 +1749,7 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'report_reports' => "$IP/extensions/Report/sql/table.sql",
+				'report_reports' => 'extensions/Report/sql/table.sql',
 			],
 			'permissions' => [
 				'user' => [
@@ -1799,17 +1766,6 @@ $wgManageWikiExtensions = [
 		],
 		'section' => 'specialpages',
 	],
-	'semanticdrilldown' => [
-			'name' => 'SemanticDrilldown',
-			'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:Semantic_Drilldown',
-			'conflicts' => false,
-			'requires' => [
-					'extensions' => [
-						'semanticmediawiki',
-					],
-			],
-			'section' => 'specialpages',
-		],
 	'simplechanges' => [
 		'name' => 'SimpleChanges',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:SimpleChanges',
@@ -1852,6 +1808,7 @@ $wgManageWikiExtensions = [
 				'*' => [
 					'permissions' => [
 						'translate',
+						'unfuzzy'
 					],
 				],
 				'sysop' => [
@@ -1868,17 +1825,18 @@ $wgManageWikiExtensions = [
 				],
 			],
 			'sql' => [
-				'revtag' => "$IP/extensions/Translate/sql/mysql/revtag.sql",
-				'translate_cache' => "$IP/extensions/Translate/sql/mysql/translate_cache.sql",
-				'translate_groupreviews' => "$IP/extensions/Translate/sql/mysql/translate_groupreviews.sql",
-				'translate_groupstats' => "$IP/extensions/Translate/sql/mysql/translate_groupstats.sql",
-				'translate_messageindex' => "$IP/extensions/Translate/sql/mysql/translate_messageindex.sql",
-				'translate_metadata' => "$IP/extensions/Translate/sql/mysql/translate_metadata.sql",
-				'translate_reviews' => "$IP/extensions/Translate/sql/mysql/translate_reviews.sql",
-				'translate_sections' => "$IP/extensions/Translate/sql/mysql/translate_sections.sql",
-				'translate_stash' => "$IP/extensions/Translate/sql/mysql/translate_stash.sql",
-				'translate_tms' => "$IP/extensions/Translate/sql/mysql/translate_tm.sql",
-				'translate_translatable_bundles' => "$IP/extensions/Translate/sql/mysql/translate_translatable_bundles.sql",
+				'revtag' => 'extensions/Translate/sql/mysql/revtag.sql',
+				'translate_cache' => 'extensions/Translate/sql/mysql/translate_cache.sql',
+				'translate_groupreviews' => 'extensions/Translate/sql/mysql/translate_groupreviews.sql',
+				'translate_groupstats' => 'extensions/Translate/sql/mysql/translate_groupstats.sql',
+				'translate_message_group_subscriptions' => 'extensions/Translate/sql/mysql/translate_message_group_subscriptions.sql',
+				'translate_messageindex' => 'extensions/Translate/sql/mysql/translate_messageindex.sql',
+				'translate_metadata' => 'extensions/Translate/sql/mysql/translate_metadata.sql',
+				'translate_reviews' => 'extensions/Translate/sql/mysql/translate_reviews.sql',
+				'translate_sections' => 'extensions/Translate/sql/mysql/translate_sections.sql',
+				'translate_stash' => 'extensions/Translate/sql/mysql/translate_stash.sql',
+				'translate_tms' => 'extensions/Translate/sql/mysql/translate_tm.sql',
+				'translate_translatable_bundles' => 'extensions/Translate/sql/mysql/translate_translatable_bundles.sql',
 			],
 		],
 		'section' => 'specialpages',
@@ -1936,8 +1894,8 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'oldvideo' => "$IP/extensions/Video/sql/oldvideo.sql",
-				'video' => "$IP/extensions/Video/sql/video.sql",
+				'oldvideo' => 'extensions/Video/sql/oldvideo.sql',
+				'video' => 'extensions/Video/sql/video.sql',
 			],
 			'permissions' => [
 				'user' => [
@@ -1974,6 +1932,13 @@ $wgManageWikiExtensions = [
 	'webchat' => [
 		'name' => 'WebChat',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:WebChat',
+		'conflicts' => false,
+		'requires' => [],
+		'section' => 'specialpages',
+	],
+	'wikipoints' => [
+		'name' => 'WikiPoints',
+		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:WikiPoints',
 		'conflicts' => false,
 		'requires' => [],
 		'section' => 'specialpages',
@@ -2018,14 +1983,49 @@ $wgManageWikiExtensions = [
 		'section' => 'other',
 	],
 	'articlefeedbackv5' => [
-		'name' => 'ArticleFeedbackv5',
+		'name' => 'Article Feedback',
 		'displayname' => 'ArticleFeedbackv5',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:ArticleFeedbackv5',
 		'conflicts' => false,
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'ratings' => "$IP/extensions/ArticleFeedbackv5/ArticleFeedbackv5.sql"
+				'aft_feedback' => 'extensions/ArticleFeedbackv5/sql/ArticleFeedbackv5.sql',
+			],
+			'permissions' => [
+				'*' => [
+					'permissions' => [
+						'aft-reader',
+					],
+				],
+				'user' => [
+					'permissions' => [
+						'aft-member',
+					],
+				],
+				'autoconfirmed' => [
+					'permissions' => [
+						'aft-editor',
+					],
+				],
+				'confirmed' => [
+					'permissions' => [
+						'aft-editor',
+					],
+				],
+				'rollbacker' => [
+					'permissions' => [
+						'aft-editor',
+						'aft-monitor',
+					],
+				],
+				'sysop' => [
+					'permissions' => [
+						'aft-editor',
+						'aft-monitor',
+						'aft-administrator',
+					],
+				],
 			],
 		],
 		'section' => 'other',
@@ -2057,7 +2057,7 @@ $wgManageWikiExtensions = [
 				],
 			],
 			'sql' => [
-				'ratings' => "$IP/extensions/ArticleRatings/ratings.sql"
+				'ratings' => 'extensions/ArticleRatings/ratings.sql',
 			],
 		],
 		'section' => 'other',
@@ -2078,7 +2078,12 @@ $wgManageWikiExtensions = [
 		'name' => 'AutoCreatePage',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:AutoCreatePage',
 		'conflicts' => false,
-		'requires' => [],
+		'help' => 'Note: This extension should no longer be enabled on new wikis.',
+		'requires' => [
+			'permissions' => [
+				'managewiki-restricted',
+			],
+		],
 		'section' => 'other',
 	],
 	'blogpage' => [
@@ -2163,9 +2168,8 @@ $wgManageWikiExtensions = [
 		'help' => 'This extension MUST NOT be disabled via ManageWiki. Please create a [[m:Phorge|Phorge]] task instead.',
 		'install' => [
 			'mwscript' => [
-				"$IP/extensions/MirahezeMagic/maintenance/resetWikiCaches.php" => [],
-				"$IP/extensions/CirrusSearch/maintenance/UpdateSearchIndexConfig.php" => [],
-				"$IP/extensions/CirrusSearch/maintenance/ForceSearchIndex.php" => [
+				UpdateSearchIndexConfig::class => [],
+				ForceSearchIndex::class => [
 					'skipLinks' => true,
 					'indexOnSkip' => true,
 					'repeat-with' => [
@@ -2200,6 +2204,14 @@ $wgManageWikiExtensions = [
 	'commonsmetadata' => [
 		'name' => 'CommonsMetadata',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:CommonsMetadata',
+		'conflicts' => false,
+		'requires' => [],
+		'section' => 'other',
+	],
+	'customsearchprofiles' => [
+		'name' => 'CustomSearchProfiles',
+		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:CustomSearchProfiles',
+		'help' => 'Note: This extension is currently not configurable in ManageWiki. Please create a task on Phorge or a pull request to configure it.',
 		'conflicts' => false,
 		'requires' => [],
 		'section' => 'other',
@@ -2252,8 +2264,8 @@ $wgManageWikiExtensions = [
 		],
 		'install' => [
 			'sql' => [
-				'discussiontools_items' => "$IP/extensions/DiscussionTools/sql/mysql/discussiontools_persistent.sql",
-				'discussiontools_subscription' => "$IP/extensions/DiscussionTools/sql/mysql/discussiontools_subscription.sql",
+				'discussiontools_items' => 'extensions/DiscussionTools/sql/mysql/discussiontools_persistent.sql',
+				'discussiontools_subscription' => 'extensions/DiscussionTools/sql/mysql/discussiontools_subscription.sql',
 			],
 		],
 		'section' => 'other',
@@ -2265,10 +2277,19 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'section' => 'other',
 	],
+	'editsimilar' => [
+		'name' => 'EditSimilar',
+		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:EditSimilar',
+		'conflicts' => false,
+		'requires' => [],
+		'install' => [],
+		'section' => 'other',
+	],
 	'editsubpages' => [
 		'name' => 'EditSubpages',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:EditSubpages',
 		'conflicts' => false,
+		'help' => 'Note: This extension prevents all anonymous (IP) users from editing by default. Only whitelisted pages are exempted.',
 		'requires' => [],
 		'install' => [],
 		'section' => 'other',
@@ -2284,10 +2305,18 @@ $wgManageWikiExtensions = [
 		],
 		'install' => [
 			'sql' => [
-				'ed_url_cache' => "$IP/extensions/ExternalData/sql/mysql/ExternalData.sql"
+				'ed_url_cache' => 'extensions/ExternalData/sql/mysql/ExternalData.sql',
 			],
 		],
 		'section' => 'other',
+	],
+	'featuredfeeds' => [
+		'name' => 'FeaturedFeeds',
+		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:FeaturedFeeds',
+		'help' => '<b>Configuration of</b> <code>$wgFeaturedFeeds</code> <b>is not possible in ManageWiki.</b><br />File a task on [[m:Special:MyLanguage/Phorge|Phorge]] or a pull request on our mw-config repository with the desired configuration.',
+		'conflicts' => false,
+		'requires' => [],
+		'section' => 'other'
 	],
 	'flexdiagrams' => [
 		'name' => 'Flex Diagrams',
@@ -2417,7 +2446,7 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'geo_tags' => "$IP/extensions/GeoData/sql/mysql/tables-generated.sql"
+				'geo_tags' => 'extensions/GeoData/sql/mysql/tables-generated.sql',
 			],
 		],
 		'section' => 'other',
@@ -2498,6 +2527,7 @@ $wgManageWikiExtensions = [
 		'name' => 'JsonConfig',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:JsonConfig',
 		'conflicts' => false,
+		'help' => 'Note: This extension stores JSON configuration for other extensions. Storing JSON data on a wiki page is supported by MediaWiki already and does not require enabling this extension.',
 		'requires' => [],
 		'section' => 'other',
 	],
@@ -2505,6 +2535,7 @@ $wgManageWikiExtensions = [
 		'name' => 'Language Selector',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:LanguageSelector',
 		'conflicts' => false,
+		'help' => 'Note: This extension is unmaintained and has a known bug of showing pages in a random language. Consider using UniversalLanguageSelector instead.',
 		'requires' => [],
 		'section' => 'other',
 	],
@@ -2519,6 +2550,7 @@ $wgManageWikiExtensions = [
 		'name' => 'LinkSuggest',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:LinkSuggest',
 		'conflicts' => false,
+		'help' => 'Note: This extension does not work when syntax highlighting is enabled ([[mediazilla:T300618|T300618]]). Consider enabling the "Improved Syntax Highlighting" beta feature in your personal preferences, which provides a similar feature.',
 		'requires' => [],
 		'section' => 'other',
 	],
@@ -2538,13 +2570,6 @@ $wgManageWikiExtensions = [
 				'minervaneue',
 			],
 		],
-		'section' => 'other',
-	],
-	'mobiletabsplugin' => [
-		'name' => 'MobileTabsPlugin',
-		'linkPage' => 'https://github.com/fuerthwiki/MobileTabsPlugin',
-		'conflicts' => false,
-		'requires' => [],
 		'section' => 'other',
 	],
 	'multimediaviewer' => [
@@ -2607,7 +2632,7 @@ $wgManageWikiExtensions = [
 				],
 			],
 			'sql' => [
-				'nl_newsletters' => "$IP/extensions/Newsletter/sql/mysql/tables-generated.sql",
+				'nl_newsletters' => 'extensions/Newsletter/sql/mysql/tables-generated.sql',
 			],
 		],
 		'section' => 'other',
@@ -2615,7 +2640,7 @@ $wgManageWikiExtensions = [
 	'newusermessage' => [
 		'name' => 'NewUserMessage',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:NewUserMessage',
-		'conflicts' => 'flow',
+		'conflicts' => false,
 		'requires' => [],
 		'section' => 'other',
 	],
@@ -2633,7 +2658,7 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'page_assessments_projects' => "$IP/extensions/PageAssessments/db/mysql/tables-generated.sql"
+				'page_assessments_projects' => 'extensions/PageAssessments/db/mysql/tables-generated.sql',
 			],
 		],
 		'section' => 'other',
@@ -2702,9 +2727,9 @@ $wgManageWikiExtensions = [
 		],
 		'install' => [
 			'sql' => [
-				'poll_choice' => "$IP/extensions/PollNY/sql/poll_choice.sql",
-				'poll_question' => "$IP/extensions/PollNY/sql/poll_question.sql",
-				'poll_user_vote' => "$IP/extensions/PollNY/sql/poll_user_vote.sql",
+				'poll_choice' => 'extensions/PollNY/sql/poll_choice.sql',
+				'poll_question' => 'extensions/PollNY/sql/poll_question.sql',
+				'poll_user_vote' => 'extensions/PollNY/sql/poll_user_vote.sql',
 			],
 			'permissions' => [
 				'*' => [
@@ -2728,7 +2753,7 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'pr_index' => "$IP/extensions/ProofreadPage/sql/tables-generated.sql"
+				'pr_index' => 'extensions/ProofreadPage/sql/tables-generated.sql',
 			],
 			'namespaces' => [
 				'Page' => [
@@ -2798,7 +2823,7 @@ $wgManageWikiExtensions = [
 		],
 		'install' => [
 			'sql' => [
-				'wbs_propertypairs' => "$IP/extensions/PropertySuggester/sql/mysql/tables-generated.sql"
+				'wbs_propertypairs' => 'extensions/PropertySuggester/sql/mysql/tables-generated.sql',
 			],
 		],
 		'section' => 'other',
@@ -2841,8 +2866,8 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'ratepage_contest' => "$IP/extensions/RatePage/sql/create-table--ratepage-contest.sql",
-				'ratepage_vote' => "$IP/extensions/RatePage/sql/create-table--ratepage-vote.sql"
+				'ratepage_contest' => 'extensions/RatePage/sql/create-table--ratepage-contest.sql',
+				'ratepage_vote' => 'extensions/RatePage/sql/create-table--ratepage-vote.sql',
 			],
 			'permissions' => [
 				'*' => [
@@ -2887,6 +2912,13 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'section' => 'other',
 	],
+	'renderblocking' => [
+		'name' => 'RenderBlocking',
+		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:RenderBlocking',
+		'conflicts' => false,
+		'requires' => [],
+		'section' => 'other',
+	],
 	'revisionslider' => [
 		'name' => 'RevisionSlider',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:RevisionSlider',
@@ -2899,6 +2931,37 @@ $wgManageWikiExtensions = [
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:SandboxLink',
 		'conflicts' => false,
 		'requires' => [],
+		'section' => 'other',
+	],
+	'searchdigest' => [
+		'name' => 'SearchDigest',
+		'linkPage' => 'https://github.com/weirdgloop/mediawiki-extensions-SearchDigest',
+		'conflicts' => false,
+		'requires' => [],
+		'install' => [
+			'sql' => [
+				'searchdigest_blocks' => 'extensions/SearchDigest/sql/searchdigest_blocks.sql',
+				'searchdigest' => [
+					'patch' => 'extensions/SearchDigest/sql/searchdigest.sql',
+					'indexes' => [
+						'sd_misses_touched' => 'extensions/SearchDigest/sql/patch_searchdigest_sd_misses_touched.sql',
+					],
+				],
+			],
+			'permissions' => [
+				'*' => [
+					'permissions' => [
+						'searchdigest-reader',
+						'searchdigest-reader-stats',
+					],
+				],
+				'sysop' => [
+					'permissions' => [
+						'searchdigest-block',
+					],
+				],
+			],
+		],
 		'section' => 'other',
 	],
 	'share' => [
@@ -2936,11 +2999,31 @@ $wgManageWikiExtensions = [
 					'protection' => 'edit',
 					'content' => 0,
 					'aliases' => [],
-					'contentmodel' => 'wikitext',
+					'contentmodel' => 'blog_post',
 					'additional' => []
 				],
 				'User_blog_talk' => [
 					'id' => 503,
+					'searchable' => 0,
+					'subpages' => 1,
+					'protection' => '',
+					'content' => 0,
+					'aliases' => [],
+					'contentmodel' => 'wikitext',
+					'additional' => []
+				],
+				'Blog' => [
+					'id' => 1502,
+					'searchable' => 1,
+					'subpages' => 1,
+					'protection' => '',
+					'content' => 0,
+					'aliases' => [],
+					'contentmodel' => 'blog_post',
+					'additional' => []
+				],
+				'Blog_talk' => [
+					'id' => 1503,
 					'searchable' => 0,
 					'subpages' => 1,
 					'protection' => '',
@@ -2972,23 +3055,24 @@ $wgManageWikiExtensions = [
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:SocialProfile',
 		'description' => 'socialprofile-desc',
 		'conflicts' => false,
+		'help' => 'Note: This extension is highly complex, minimally maintained, and generates many bug reports from users. Consider using UserProfileV2 instead.',
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'user_profile' => "$IP/extensions/SocialProfile/UserProfile/sql/user_profile.sql",
-				'user_fields_privacy' => "$IP/extensions/SocialProfile/UserProfile/sql/user_fields_privacy.sql",
-				'user_system_messages' => "$IP/extensions/SocialProfile/UserStats/sql/user_system_messages.sql",
-				'user_points_monthly' => "$IP/extensions/SocialProfile/UserStats/sql/user_points_monthly.sql",
-				'user_points_archive' => "$IP/extensions/SocialProfile/UserStats/sql/user_points_archive.sql",
-				'user_points_weekly' => "$IP/extensions/SocialProfile/UserStats/sql/user_points_weekly.sql",
-				'user_stats' => "$IP/extensions/SocialProfile/UserStats/sql/user_stats.sql",
-				'user_system_gift' => "$IP/extensions/SocialProfile/SystemGifts/sql/user_system_gift.sql",
-				'system_gift' => "$IP/extensions/SocialProfile/SystemGifts/sql/system_gift.sql",
-				'user_relationship' => "$IP/extensions/SocialProfile/UserRelationship/sql/user_relationship.sql",
-				'user_relationship_request' => "$IP/extensions/SocialProfile/UserRelationship/sql/user_relationship_request.sql",
-				'user_gift' => "$IP/extensions/SocialProfile/UserGifts/sql/user_gift.sql",
-				'gift' => "$IP/extensions/SocialProfile/UserGifts/sql/gift.sql",
-				'user_board' => "$IP/extensions/SocialProfile/UserBoard/sql/user_board.sql"
+				'user_profile' => 'extensions/SocialProfile/UserProfile/sql/user_profile.sql',
+				'user_fields_privacy' => 'extensions/SocialProfile/UserProfile/sql/user_fields_privacy.sql',
+				'user_system_messages' => 'extensions/SocialProfile/UserStats/sql/user_system_messages.sql',
+				'user_points_monthly' => 'extensions/SocialProfile/UserStats/sql/user_points_monthly.sql',
+				'user_points_archive' => 'extensions/SocialProfile/UserStats/sql/user_points_archive.sql',
+				'user_points_weekly' => 'extensions/SocialProfile/UserStats/sql/user_points_weekly.sql',
+				'user_stats' => 'extensions/SocialProfile/UserStats/sql/user_stats.sql',
+				'user_system_gift' => 'extensions/SocialProfile/SystemGifts/sql/user_system_gift.sql',
+				'system_gift' => 'extensions/SocialProfile/SystemGifts/sql/system_gift.sql',
+				'user_relationship' => 'extensions/SocialProfile/UserRelationship/sql/user_relationship.sql',
+				'user_relationship_request' => 'extensions/SocialProfile/UserRelationship/sql/user_relationship_request.sql',
+				'user_gift' => 'extensions/SocialProfile/UserGifts/sql/user_gift.sql',
+				'gift' => 'extensions/SocialProfile/UserGifts/sql/gift.sql',
+				'user_board' => 'extensions/SocialProfile/UserBoard/sql/user_board.sql',
 			],
 			'permissions' => [
 				'sysop' => [
@@ -3011,72 +3095,15 @@ $wgManageWikiExtensions = [
 		'section' => 'other',
 		'install' => [
 			'sql' => [
-				'mws_title_index' => "$IP/extensions/OOJSPlus/vendor/mwstake/mediawiki-component-commonwebapis/sql/mws_title_index.sql",
-				'mws_user_index' => "$IP/extensions/OOJSPlus/vendor/mwstake/mediawiki-component-commonwebapis/sql/mws_user_index.sql",
+				'mws_title_index' => 'extensions/OOJSPlus/vendor/mwstake/mediawiki-component-commonwebapis/sql/mysql/mws_title_index.sql',
+				'mws_user_index' => 'extensions/OOJSPlus/vendor/mwstake/mediawiki-component-commonwebapis/sql/mysql/mws_user_index.sql',
 			],
 		],
-	],
-	'flow' => [
-		'name' => 'Flow',
-		'displayname' => 'StructuredDiscussions (Flow)',
-		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:StructuredDiscussions',
-		'conflicts' => false,
-		'help' => 'Deprecated by WMF, who recommends DiscussionTools instead.',
-		'requires' => [
-			'permissions' => [
-				'managewiki-restricted',
-			],
-		],
-		'install' => [
-			'sql' => [
-				'flow_revision' => "$IP/extensions/Flow/sql/mysql/tables-generated.sql"
-			],
-			'namespaces' => [
-				'Topic' => [
-					'id' => 2600,
-					'searchable' => 0,
-					'subpages' => 0,
-					'protection' => '',
-					'content' => 0,
-					'aliases' => [],
-					'contentmodel' => 'flow-board',
-					'additional' => []
-				],
-			],
-			'permissions' => [
-				'*' => [
-					'permissions' => [
-						'flow-hide',
-					],
-				],
-				'user' => [
-					'permissions' => [
-						'flow-lock',
-					],
-				],
-				'sysop' => [
-					'permissions' => [
-						'flow-lock',
-						'flow-delete',
-						'flow-edit-post',
-					],
-				],
-				'flow-bot' => [
-					'permissions' => [
-						'flow-create-board',
-					],
-				],
-			],
-			'mwscript' => [
-				"$IP/extensions/Flow/maintenance/FlowCreateTemplates.php" => [],
-			],
-		],
-		'section' => 'other',
 	],
 	'semanticmediawiki' => [
 		'name' => 'SemanticMediaWiki',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:SemanticMediaWiki',
-		'help' => '<br/> Permanently "experimental" and may be removed with little to no prior notice. WARNING: Disabling this extension after it\'s already been enabled will clear all SemanticMediaWiki database tables as well.',
+		'help' => '<br />Permanently "experimental" and may be removed with little to no prior notice. Consider using [[mw:Extension:Cargo|Cargo]] instead. WARNING: Disabling this extension after it\'s already been enabled will clear all SemanticMediaWiki database tables as well.',
 		'conflicts' => false,
 		'requires' => [
 			'permissions' => [
@@ -3085,7 +3112,7 @@ $wgManageWikiExtensions = [
 		],
 		'install' => [
 			'mwscript' => [
-				"$IP/extensions/SemanticMediaWiki/maintenance/setupStore.php" => [],
+				'SemanticMediaWiki:setupStore' => [],
 			],
 			'namespaces' => [
 				'Property' => [
@@ -3192,7 +3219,7 @@ $wgManageWikiExtensions = [
 		],
 		'remove' => [
 			'mwscript' => [
-				"$IP/extensions/SemanticMediaWiki/maintenance/setupStore.php" => [
+				'SemanticMediaWiki:setupStore' => [
 					'delete' => false,
 					'nochecks' => false,
 				],
@@ -3305,13 +3332,15 @@ $wgManageWikiExtensions = [
 		'name' => 'TitleKey',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:TitleKey',
 		'conflicts' => 'cirrussearch',
+		// Message added due to T14896. Remove this when the task is resolved.
+		'help' => 'Note: If pages are missing from search suggestions after enabling this extension, please file a task on [[meta:Phorge|Phorge]] to report.',
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'titlekey' => "$IP/extensions/TitleKey/db_patches/tables-generated.sql"
+				'titlekey' => 'extensions/TitleKey/db_patches/tables-generated.sql',
 			],
 			'mwscript' => [
-				"$IP/extensions/TitleKey/maintenance/rebuildTitleKeys.php" => []
+				'TitleKey:rebuildTitleKeys' => []
 			],
 		],
 		'section' => 'other',
@@ -3406,15 +3435,15 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'wbc_entity_usage' => "$IP/extensions/Wikibase/client/sql/mysql/entity_usage.sql",
-				'wb_items_per_site' => "$IP/extensions/Wikibase/repo/sql/mysql/wb_items_per_site.sql",
-				'wb_id_counters' => "$IP/extensions/Wikibase/repo/sql/mysql/wb_id_counters.sql",
-				'wb_changes' => "$IP/extensions/Wikibase/repo/sql/mysql/wb_changes.sql",
-				'wb_changes_subscription' => "$IP/extensions/Wikibase/repo/sql/mysql/wb_changes_subscription.sql",
-				'wb_property_info' => "$IP/extensions/Wikibase/repo/sql/mysql/wb_property_info.sql"
+				'wbc_entity_usage' => 'extensions/Wikibase/client/sql/mysql/entity_usage.sql',
+				'wb_items_per_site' => 'extensions/Wikibase/repo/sql/mysql/wb_items_per_site.sql',
+				'wb_id_counters' => 'extensions/Wikibase/repo/sql/mysql/wb_id_counters.sql',
+				'wb_changes' => 'extensions/Wikibase/repo/sql/mysql/wb_changes.sql',
+				'wb_changes_subscription' => 'extensions/Wikibase/repo/sql/mysql/wb_changes_subscription.sql',
+				'wb_property_info' => 'extensions/Wikibase/repo/sql/mysql/wb_property_info.sql',
 			],
 			'mwscript' => [
-				"$IP/extensions/MirahezeMagic/maintenance/populateWikibaseSitesTable.php" => [],
+				PopulateWikibaseSitesTable::class => [],
 			],
 		],
 		'section' => 'other',
@@ -3426,17 +3455,16 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'wb_changes' => "$IP/extensions/Wikibase/repo/sql/mysql/wb_changes.sql",
-				'wb_changes_subscription' => "$IP/extensions/Wikibase/repo/sql/mysql/wb_changes_subscription.sql",
-				'wb_items_per_site' => "$IP/extensions/Wikibase/repo/sql/mysql/wb_items_per_site.sql",
-				'wb_id_counters' => "$IP/extensions/Wikibase/repo/sql/mysql/wb_id_counters.sql",
-				'wbt_item_terms' => "$IP/extensions/Wikibase/repo/sql/mysql/term_store.sql",
-				'wbt_term_in_lang' => "$IP/extensions/Wikibase/repo/sql/mysql/term_store.sql",
-				'wbt_text_in_lang' => "$IP/extensions/Wikibase/repo/sql/mysql/term_store.sql",
-				'wbt_text' => "$IP/extensions/Wikibase/repo/sql/mysql/term_store.sql",
-				'wbt_type' => "$IP/extensions/Wikibase/repo/sql/mysql/term_store.sql",
-				'wb_property_info' => "$IP/extensions/Wikibase/repo/sql/mysql/wb_property_info.sql",
-				'wbt_property_terms' => "$IP/extensions/Wikibase/repo/sql/mysql/term_store.sql",
+				'wb_changes' => 'extensions/Wikibase/repo/sql/mysql/wb_changes.sql',
+				'wb_changes_subscription' => 'extensions/Wikibase/repo/sql/mysql/wb_changes_subscription.sql',
+				'wb_items_per_site' => 'extensions/Wikibase/repo/sql/mysql/wb_items_per_site.sql',
+				'wb_id_counters' => 'extensions/Wikibase/repo/sql/mysql/wb_id_counters.sql',
+				'wbt_item_terms' => 'extensions/Wikibase/repo/sql/mysql/term_store.sql',
+				'wbt_term_in_lang' => 'extensions/Wikibase/repo/sql/mysql/term_store.sql',
+				'wbt_text_in_lang' => 'extensions/Wikibase/repo/sql/mysql/term_store.sql',
+				'wbt_text' => 'extensions/Wikibase/repo/sql/mysql/term_store.sql',
+				'wb_property_info' => 'extensions/Wikibase/repo/sql/mysql/wb_property_info.sql',
+				'wbt_property_terms' => 'extensions/Wikibase/repo/sql/mysql/term_store.sql',
 			],
 			'permissions' => [
 				'*' => [
@@ -3457,7 +3485,7 @@ $wgManageWikiExtensions = [
 					'protection' => '',
 					'content' => 0,
 					'aliases' => [],
-					'contentmodel' => 'wikitext',
+					'contentmodel' => 'wikibase-item',
 					'additional' => []
 				],
 				'Item_talk' => [
@@ -3477,7 +3505,7 @@ $wgManageWikiExtensions = [
 					'protection' => '',
 					'content' => 0,
 					'aliases' => [],
-					'contentmodel' => 'wikitext',
+					'contentmodel' => 'wikibase-property',
 					'additional' => []
 				],
 				'Property_talk' => [
@@ -3551,7 +3579,7 @@ $wgManageWikiExtensions = [
 		],
 		'install' => [
 			'sql' => [
-				'wbqc_constraints' => "$IP/extensions/WikibaseQualityConstraints/sql/mysql/tables-generated.sql",
+				'wbqc_constraints' => 'extensions/WikibaseQualityConstraints/sql/mysql/tables-generated.sql',
 			],
 		],
 		'section' => 'other',
@@ -3570,7 +3598,7 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'wikiforum_forums' => "$IP/extensions/WikiForum/sql/wikiforum.sql"
+				'wikiforum_forums' => 'extensions/WikiForum/sql/wikiforum.sql',
 			],
 			'permissions' => [
 				'bureaucrat' => [
@@ -3604,7 +3632,7 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'install' => [
 			'sql' => [
-				'wikilove_log' => "$IP/extensions/WikiLove/patches/tables-generated.sql"
+				'wikilove_log' => 'extensions/WikiLove/patches/tables-generated.sql',
 			],
 		],
 		'section' => 'other',
@@ -3657,6 +3685,13 @@ $wgManageWikiExtensions = [
 		'requires' => [],
 		'section' => 'skins',
 	],
+	'cologneblue' => [
+		'name' => 'Cologne Blue',
+		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Skin:Cologne_Blue',
+		'conflicts' => false,
+		'requires' => [],
+		'section' => 'skins',
+	],
 	'cosmos' => [
 		'name' => 'Cosmos',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Skin:Cosmos',
@@ -3674,20 +3709,6 @@ $wgManageWikiExtensions = [
 	'erudite' => [
 		'name' => 'Erudite',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Skin:Erudite',
-		'conflicts' => false,
-		'requires' => [],
-		'section' => 'skins',
-	],
-	'evelution' => [
-		'name' => 'Evelution',
-		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Skin:Evelution',
-		'conflicts' => false,
-		'requires' => [],
-		'section' => 'skins',
-	],
-	'eveskin' => [
-		'name' => "Eveskin",
-		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Skin:Eveskin',
 		'conflicts' => false,
 		'requires' => [],
 		'section' => 'skins',
@@ -3716,6 +3737,13 @@ $wgManageWikiExtensions = [
 	'hassomecolours' => [
 		'name' => 'HasSomeColours',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Skin:HasSomeColours',
+		'conflicts' => false,
+		'requires' => [],
+		'section' => 'skins',
+	],
+	'lakeus' => [
+		'name' => 'Lakeus',
+		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Skin:Lakeus',
 		'conflicts' => false,
 		'requires' => [],
 		'section' => 'skins',
@@ -3751,6 +3779,13 @@ $wgManageWikiExtensions = [
 	'mirage' => [
 		'name' => 'Mirage',
 		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Skin:Mirage',
+		'conflicts' => false,
+		'requires' => [],
+		'section' => 'skins',
+	],
+	'modern' => [
+		'name' => 'Modern',
+		'linkPage' => 'https://www.mediawiki.org/wiki/Special:MyLanguage/Skin:Modern',
 		'conflicts' => false,
 		'requires' => [],
 		'section' => 'skins',
