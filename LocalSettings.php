@@ -688,6 +688,7 @@ $wgConf->settings += [
 	],
 	'wgCitizenOverflowNowrapClasses' => [
 		'default' => [
+			'noresize',
 			'citizen-table-nowrap',
 			'cargoDynamicTable',
 			'dataTable',

@@ -4394,6 +4394,7 @@ $wgManageWikiSettings = [
 		'from' => 'citizen',
 		'type' => 'texts',
 		'overridedefault' => [
+			'noresize',
 			'citizen-table-nowrap',
 			'cargoDynamicTable',
 			'dataTable',
